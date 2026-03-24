@@ -11,27 +11,12 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { apiFetch } from "../utils/api";
+import { savePendingTransfer } from "../utils/pendingTransfer";
 import { clearSession, getSession, saveSession } from "../utils/session";
 import type { Transaction, User } from "../utils/types";
 
 interface ProfileResponse {
   success: boolean;
-  user: User;
-}
-
-interface TransferResponse {
-  success: boolean;
-  message: string;
-  sender: {
-    accountNo: string;
-    balance: number;
-    transactions: User["transactions"];
-  };
-}
-
-interface UpdateUpiResponse {
-  success: boolean;
-  message: string;
   user: User;
 }
 
@@ -86,9 +71,6 @@ export default function Dashboard() {
   const [description, setDescription] = useState("");
   const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
 
-  const [profileUpiId, setProfileUpiId] = useState("");
-  const [isSavingUpi, setIsSavingUpi] = useState(false);
-
   const refreshProfile = useCallback(async () => {
     const session = await getSession();
     if (!session?.user?.accountNo) {
@@ -100,7 +82,6 @@ export default function Dashboard() {
       `/auth/profile/${session.user.accountNo}`
     );
     setUser(data.user);
-    setProfileUpiId(data.user.upiId || "");
     await saveSession(data.user);
   }, [router]);
 
@@ -174,70 +155,21 @@ export default function Dashboard() {
     setNotice(null);
 
     try {
-      const data = await apiFetch<TransferResponse>("/transfer", {
-        method: "POST",
-        body: JSON.stringify({
-          fromAccount: user.accountNo,
-          toIdentifier: recipientValue.trim(),
-          recipientType,
-          amount: Number(amount),
-          description,
-        }),
+      await savePendingTransfer({
+        fromAccount: user.accountNo,
+        toIdentifier: recipientValue.trim(),
+        recipientType,
+        amount: Number(amount),
+        description,
+        returnRoute: "/dashboard",
       });
-
-      const updatedUser = {
-        ...user,
-        balance: data.sender.balance,
-        transactions: data.sender.transactions,
-      };
-      setUser(updatedUser);
-      await saveSession(updatedUser);
-      setNotice({ type: "success", text: data.message });
-      setRecipientValue("");
-      setAmount("");
-      setDescription("");
-      setActiveTab("history");
+      router.push("/transfer-mpin");
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Transfer could not be completed.";
+        error instanceof Error ? error.message : "Unable to continue to MPIN verification.";
       setNotice({ type: "error", text: message });
     } finally {
       setIsSubmittingTransfer(false);
-    }
-  };
-
-  const handleSaveUpi = async () => {
-    if (!user?.accountNo) {
-      router.replace("/login");
-      return;
-    }
-
-    if (!profileUpiId.trim()) {
-      setNotice({ type: "error", text: "Enter a valid UPI ID before saving." });
-      return;
-    }
-
-    setIsSavingUpi(true);
-    setNotice(null);
-
-    try {
-      const data = await apiFetch<UpdateUpiResponse>("/auth/upi", {
-        method: "PATCH",
-        body: JSON.stringify({
-          accountNo: user.accountNo,
-          upiId: profileUpiId.trim().toLowerCase(),
-        }),
-      });
-
-      setUser(data.user);
-      await saveSession(data.user);
-      setNotice({ type: "success", text: data.message });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Could not save UPI ID.";
-      setNotice({ type: "error", text: message });
-    } finally {
-      setIsSavingUpi(false);
     }
   };
 
@@ -460,24 +392,16 @@ export default function Dashboard() {
                 </View>
               </View>
 
-              <Text style={styles.label}>UPI ID (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="example@upi"
-                placeholderTextColor="#64748b"
-                value={profileUpiId}
-                onChangeText={setProfileUpiId}
-                autoCapitalize="none"
-              />
+              <View style={styles.profileField}>
+                <Text style={styles.profileLabel}>UPI ID</Text>
+                <Text style={styles.profileValue}>{user.upiId || "Not linked"}</Text>
+              </View>
 
               <TouchableOpacity
-                style={[styles.primaryButton, isSavingUpi && styles.buttonDisabled]}
-                onPress={() => void handleSaveUpi()}
-                disabled={isSavingUpi}
+                style={styles.primaryButton}
+                onPress={() => router.push("/setup-upi")}
               >
-                <Text style={styles.primaryButtonText}>
-                  {isSavingUpi ? "Saving..." : "Save UPI ID"}
-                </Text>
+                <Text style={styles.primaryButtonText}>Change UPI ID</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.logoutButton} onPress={() => void handleLogout()}>

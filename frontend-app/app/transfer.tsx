@@ -9,19 +9,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import useBehaviorTracker from "../hooks/useBehaviorTracker";
-import { apiFetch } from "../utils/api";
-import { getSession, saveSession } from "../utils/session";
-import type { User } from "../utils/types";
-
-interface TransferResponse {
-  success: boolean;
-  message: string;
-  sender: {
-    accountNo: string;
-    balance: number;
-    transactions: User["transactions"];
-  };
-}
+import { savePendingTransfer } from "../utils/pendingTransfer";
+import { getSession } from "../utils/session";
 
 export default function Transfer() {
   const router = useRouter();
@@ -56,30 +45,21 @@ export default function Transfer() {
     setIsSubmitting(true);
 
     try {
-      const data = await apiFetch<TransferResponse>("/transfer", {
-        method: "POST",
-        body: JSON.stringify({
-          fromAccount: session.user.accountNo,
-          toUpiId,
-          amount: Number(amount),
-          description,
-        }),
+      await savePendingTransfer({
+        fromAccount: session.user.accountNo,
+        toIdentifier: toUpiId.trim(),
+        recipientType: "upi",
+        amount: Number(amount),
+        description,
+        returnRoute: "/transfer",
       });
-
-      await saveSession({
-        ...session.user,
-        balance: data.sender.balance,
-        transactions: data.sender.transactions,
-      });
-
-      Alert.alert("Transfer complete", data.message);
-      router.replace("/dashboard");
+      router.push("/transfer-mpin");
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "Transfer could not be completed.";
-      Alert.alert("Transfer failed", message);
+          : "Unable to continue to MPIN verification.";
+      Alert.alert("Could not continue", message);
     } finally {
       setIsSubmitting(false);
     }

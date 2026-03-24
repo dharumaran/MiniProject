@@ -1,20 +1,47 @@
 const express = require("express");
+const crypto = require("crypto");
 const User = require("../models/User");
 
 const router = express.Router();
 
+function verifyMpinHash(mpin, storedValue) {
+  if (!storedValue || !storedValue.includes(":")) {
+    return false;
+  }
+  const [salt, expectedHash] = storedValue.split(":");
+  if (!salt || !expectedHash) {
+    return false;
+  }
+
+  const actualHash = crypto.scryptSync(String(mpin), salt, 64).toString("hex");
+  const expectedBuffer = Buffer.from(expectedHash, "hex");
+  const actualBuffer = Buffer.from(actualHash, "hex");
+
+  if (expectedBuffer.length !== actualBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuffer, actualBuffer);
+}
+
 router.post("/", async (req, res) => {
-  const { fromAccount, toUpiId, toIdentifier, recipientType, amount, description } =
+  const { fromAccount, toUpiId, toIdentifier, recipientType, amount, description, mpin } =
     req.body;
   const parsedAmount = Number(amount);
   const rawRecipient = String(toIdentifier || toUpiId || "").trim();
   const normalizedRecipientType = String(recipientType || "auto").toLowerCase();
 
-  if (!fromAccount || !rawRecipient || !parsedAmount || parsedAmount <= 0) {
+  if (!fromAccount || !rawRecipient || !parsedAmount || parsedAmount <= 0 || !mpin) {
     return res.status(400).json({
       success: false,
       message:
-        "From account, recipient identifier (UPI/account/mobile), and a valid amount are required.",
+        "From account, recipient identifier (UPI/account/mobile), MPIN, and a valid amount are required.",
+    });
+  }
+  if (!/^\d{4}$/.test(String(mpin).trim())) {
+    return res.status(400).json({
+      success: false,
+      message: "MPIN must be exactly 4 digits.",
     });
   }
 
@@ -50,6 +77,12 @@ router.post("/", async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Sender account not found.",
+      });
+    }
+    if (!verifyMpinHash(String(mpin).trim(), sender.mpinHash)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid MPIN.",
       });
     }
 

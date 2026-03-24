@@ -135,12 +135,18 @@ exports.signup = async (req, res) => {
 };
 
 exports.updateUpiId = async (req, res) => {
-  const { accountNo, upiId } = req.body;
+  const { accountNo, upiId, mpin } = req.body;
 
-  if (!accountNo || !upiId) {
+  if (!accountNo || !upiId || !mpin) {
     return res.status(400).json({
       success: false,
-      message: "Account number and UPI ID are required.",
+      message: "Account number, UPI ID, and MPIN are required.",
+    });
+  }
+  if (!/^\d{4}$/.test(String(mpin).trim())) {
+    return res.status(400).json({
+      success: false,
+      message: "MPIN must be exactly 4 digits.",
     });
   }
 
@@ -166,6 +172,12 @@ exports.updateUpiId = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "User not found.",
+      });
+    }
+    if (!verifyMpinHash(String(mpin).trim(), user.mpinHash)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid MPIN.",
       });
     }
 

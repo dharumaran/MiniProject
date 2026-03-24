@@ -1,5 +1,52 @@
 const os = require("os");
-const appJson = require("./app.json");
+
+const baseExpoConfig = {
+  name: "frontend-app",
+  slug: "frontend-app",
+  version: "1.0.0",
+  orientation: "portrait",
+  icon: "./assets/images/icon.png",
+  scheme: "frontendapp",
+  userInterfaceStyle: "automatic",
+  newArchEnabled: true,
+  ios: {
+    supportsTablet: true,
+  },
+  android: {
+    adaptiveIcon: {
+      foregroundImage: "./assets/images/adaptive-icon.png",
+      backgroundColor: "#ffffff",
+    },
+    edgeToEdgeEnabled: true,
+  },
+  web: {
+    bundler: "metro",
+    output: "static",
+    favicon: "./assets/images/favicon.png",
+  },
+  plugins: [
+    "expo-router",
+    "expo-local-authentication",
+    "expo-secure-store",
+    "expo-font",
+    "expo-web-browser",
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/images/splash-icon.png",
+        imageWidth: 200,
+        resizeMode: "contain",
+        backgroundColor: "#ffffff",
+      },
+    ],
+  ],
+  experiments: {
+    typedRoutes: true,
+  },
+  extra: {
+    apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:5000/api",
+  },
+};
 
 function getLanIpAddress() {
   const interfaces = os.networkInterfaces();
@@ -21,20 +68,19 @@ function getLanIpAddress() {
 }
 
 module.exports = () => {
-  const expoConfig = appJson.expo || {};
   const detectedLanIp = getLanIpAddress();
   const detectedApiBaseUrl = detectedLanIp
     ? `http://${detectedLanIp}:5000/api`
     : undefined;
 
   return {
-    ...expoConfig,
+    ...baseExpoConfig,
     extra: {
-      ...expoConfig.extra,
+      ...baseExpoConfig.extra,
       apiBaseUrl:
-        process.env.EXPO_PUBLIC_API_BASE_URL ||
         detectedApiBaseUrl ||
-        expoConfig.extra?.apiBaseUrl,
+        process.env.EXPO_PUBLIC_API_BASE_URL ||
+        baseExpoConfig.extra?.apiBaseUrl,
     },
   };
 };

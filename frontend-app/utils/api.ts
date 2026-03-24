@@ -9,6 +9,14 @@ function isLoopbackHost(host: string) {
   return host === "127.0.0.1" || host === "localhost" || host === "::1";
 }
 
+function isTunnelHost(host: string) {
+  return (
+    host.endsWith(".exp.direct") ||
+    host.endsWith(".ngrok.io") ||
+    host.endsWith(".ngrok-free.app")
+  );
+}
+
 function isPrivateLanUrl(url: string) {
   try {
     const { hostname } = new URL(url);
@@ -52,7 +60,7 @@ function getHostUriBaseUrl() {
   }
 
   const host = hostUri.split(":")[0];
-  if (isLoopbackHost(host)) {
+  if (isLoopbackHost(host) || isTunnelHost(host)) {
     return null;
   }
 
@@ -88,18 +96,28 @@ export function getCurrentApiBaseUrl() {
 async function fetchWithTimeout(
   input: string,
   init?: RequestInit,
-  timeoutMs = 8000
+  timeoutMs = 3500
 ) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   try {
-    return await fetch(input, {
-      ...init,
-      signal: controller.signal,
-    });
+    return await Promise.race([
+      fetch(input, {
+        ...init,
+        signal: controller.signal,
+      }),
+      new Promise<Response>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          controller.abort();
+          reject(new Error(`Request timed out. API URL: ${input}`));
+        }, timeoutMs);
+      }),
+    ]);
   } finally {
-    clearTimeout(timeout);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -134,17 +152,29 @@ export async function apiFetch<T>(
 
       lastSuccessfulApiBaseUrl = baseUrl;
 
-      const data = (await response.json()) as T & { message?: string };
-
-      if (!response.ok) {
-        throw new Error(data.message || `Request failed. API base URL: ${baseUrl}`);
+      let data: (T & { message?: string }) | null = null;
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        data = (await response.json()) as T & { message?: string };
+      } else {
+        const text = await response.text();
+        data = { message: text } as T & { message?: string };
       }
 
-      return data;
+      if (!response.ok) {
+        throw new Error(
+          data?.message || `Request failed. API base URL: ${baseUrl}`
+        );
+      }
+
+      return data as T;
     } catch (error) {
       if (error instanceof Error && error.name !== "AbortError") {
         lastNetworkError = error;
-        if (!/Network request failed/i.test(error.message)) {
+        if (
+          !/Network request failed/i.test(error.message) &&
+          !/Request timed out/i.test(error.message)
+        ) {
           throw error;
         }
       } else {

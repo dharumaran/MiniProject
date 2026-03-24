@@ -7,7 +7,13 @@ const mongoUri =
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(mongoUri);
+    mongoose.set("bufferCommands", false);
+
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
     await User.syncIndexes();
     console.log("MongoDB connected");
   } catch (err) {

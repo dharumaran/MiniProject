@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
-import { PanResponder, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
+import { recordTouchSnapshot } from "../hooks/useBehaviorCsvCapture";
 
 export default function GestureWrapper({
   children,
@@ -17,19 +18,42 @@ export default function GestureWrapper({
     }
   };
 
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
-      longPressTimeout.current = setTimeout(() => {
-        router.replace("/fake-dashboard");
-      }, 4000);
-    },
-    onPanResponderRelease: clearLongPressTimeout,
-    onPanResponderTerminate: clearLongPressTimeout,
-  });
-
   return (
-    <View style={{ flex: 1 }} {...panResponder.panHandlers}>
+    <View
+      style={{ flex: 1 }}
+      onTouchStart={(evt) => {
+        clearLongPressTimeout();
+        longPressTimeout.current = setTimeout(() => {
+          router.replace("/fake-dashboard");
+        }, 4000);
+        recordTouchSnapshot({
+          action: "start",
+          touchX: evt.nativeEvent.locationX,
+          touchY: evt.nativeEvent.locationY,
+          pageX: evt.nativeEvent.pageX,
+          pageY: evt.nativeEvent.pageY,
+        });
+      }}
+      onTouchMove={(evt) => {
+        recordTouchSnapshot({
+          action: "move",
+          touchX: evt.nativeEvent.locationX,
+          touchY: evt.nativeEvent.locationY,
+          pageX: evt.nativeEvent.pageX,
+          pageY: evt.nativeEvent.pageY,
+        });
+      }}
+      onTouchEnd={(evt) => {
+        clearLongPressTimeout();
+        recordTouchSnapshot({
+          action: "end",
+          touchX: evt.nativeEvent.locationX,
+          touchY: evt.nativeEvent.locationY,
+          pageX: evt.nativeEvent.pageX,
+          pageY: evt.nativeEvent.pageY,
+        });
+      }}
+    >
       {children}
     </View>
   );
