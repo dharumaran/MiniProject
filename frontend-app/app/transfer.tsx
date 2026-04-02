@@ -70,7 +70,7 @@ export default function Transfer() {
       <View style={styles.card}>
         <Text style={styles.title}>Send Money with UPI</Text>
         <Text style={styles.subtitle}>
-          Example recipient IDs: aarav@upi or meera@upi
+          Example recipient IDs: name@upi
         </Text>
 
         <TextInput

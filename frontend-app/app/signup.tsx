@@ -94,7 +94,7 @@ export default function Signup() {
       <View style={styles.card}>
         <Text style={styles.title}>Create Your Bank Profile</Text>
         <Text style={styles.subtitle}>
-          Register now. UPI setup is optional and can be done later from your profile.
+          Register now.
         </Text>
 
         <TextInput

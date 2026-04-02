@@ -86,7 +86,7 @@ export default function Login() {
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.title}>VigilAuth Bank</Text>
+        <Text style={styles.title}>Bank</Text>
         <Text style={styles.subtitle}>
           Login with account number or phone number and your MPIN.
         </Text>
